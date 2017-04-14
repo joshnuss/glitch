@@ -1,33 +1,56 @@
 defmodule Glitch.NoticeController do
   use Glitch.Web, :controller
 
-  def create(conn, %{"project_id" => "1"}) do
-    conn
-    |> put_status(:unauthorized)
-    |> json(%{error: "Unauthorized. project_key was not found or is invalid."})
-  end
+  @errors %{
+    unauthorized: "Unauthorized. project_key was not found or is invalid.",
+    bad_request: "Bad request. Invalid data received.",
+    forbidden: "Request forbidden.",
+    too_many_requests: "Too many requests, try again later."
+  }
 
-  def create(conn, %{"project_id" => "2"}) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Bad request. Invalid data received."})
-  end
+  defmodule Notice do
+    def authorized(%{"project_id" => "1"}),
+      do: :unauthorized
 
-  def create(conn, %{"project_id" => "3"}) do
-    conn
-    |> put_status(:forbidden)
-    |> json(%{error: "Request forbidden."})
-  end
+    def authorized(data),
+      do: {:ok, data}
 
-  def create(conn, %{"project_id" => "4"}) do
-    conn
-    |> put_status(:too_many_requests)
-    |> json(%{error: "Too many requests, try again later."})
+    def valid(%{"project_id" => "2"}),
+      do: :bad_request
+
+    def valid(data),
+      do: {:ok, data}
+
+    def allowed(%{"project_id" => "3"}),
+      do: :forbidden
+
+    def allowed(data),
+      do: {:ok, data}
+
+    def throttle(%{"project_id" => "4"}),
+      do: :too_many_requests
+
+    def throttle(data),
+      do: {:ok, data}
+
+    def write(data),
+      do: {:ok, data}
   end
 
   def create(conn, params) do
-    conn
-    |> put_status(:created)
-    |> json(params)
+    with {:ok, authorized} <- Notice.authorized(params),
+         {:ok, valid}      <- Notice.valid(authorized),
+         {:ok, allowed}    <- Notice.allowed(valid),
+         {:ok, free}       <- Notice.throttle(allowed),
+         {:ok, result}     <- Notice.write(free) do
+      conn
+      |> put_status(:created)
+      |> json(result)
+    else
+      error ->
+        conn
+        |> put_status(error)
+        |> json(%{error: @errors[error]})
+    end
   end
 end
