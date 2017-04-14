@@ -19,8 +19,9 @@ defmodule Glitch.Router do
     get "/", PageController, :index
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", Glitch do
-  #   pipe_through :api
-  # end
+  scope "/api/v3", Glitch do
+    pipe_through :api
+
+    resources "/projects/:project_id/notices", NoticeController, only: [:create]
+  end
 end
